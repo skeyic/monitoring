@@ -10,7 +10,7 @@ import (
 
 const (
 	SinaFinanceBaseURL              = "http://zhibo.sina.com.cn/api/zhibo/feed?page=%d&page_size=%d&zhibo_id=152"
-	DefaultPageSize                 = 100
+	SinaFinanceDefaultPageSize      = 100
 	TheSinaFinanceCollectorFileName = "TheSinaFinanceCollector.data"
 )
 
@@ -33,7 +33,7 @@ func (s SinaFinanceMsgs) Len() int {
 }
 
 func (s SinaFinanceMsgs) Less(i, j int) bool {
-	return s[i].CreateTime < s[j].CreateTime
+	return s[i].CommentID < s[j].CommentID
 }
 
 func (s SinaFinanceMsgs) Swap(i, j int) {
@@ -51,19 +51,14 @@ func (c *SinaFinanceCollector) SaveToFile() (err error) {
 }
 
 func (c *SinaFinanceCollector) LoadFromFile() (err error) {
-	var (
-		n = &SinaFinanceCollector{}
-	)
 	data, err := utils.ReadFromFile(c.fileName)
 	if err != nil {
 		return
 	}
-	err = json.Unmarshal(data, &n)
+	err = json.Unmarshal(data, &c)
 	if err != nil {
 		return
 	}
-
-	c.MergeMsgs(c.Msgs, n.Msgs)
 	return
 }
 
@@ -112,19 +107,19 @@ func (c *SinaFinanceCollector) MergeMsgs(sourceMsgs, newMsgs []*SinaFinanceMsg) 
 		return sourceMsgs
 	}
 
-	if newMsgs[newMsgsLength-1].CreateTime > sourceMsgs[0].CreateTime {
+	if newMsgs[newMsgsLength-1].CommentID > sourceMsgs[0].CommentID {
 		return append(sourceMsgs, newMsgs...)
 	}
 
-	if newMsgs[newMsgsLength-1].CreateTime > sourceMsgs[0].CreateTime {
+	if newMsgs[newMsgsLength-1].CommentID > sourceMsgs[0].CommentID {
 		return append(sourceMsgs, newMsgs...)
 	}
 
 	for {
-		if newMsgs[newMsgsAnchor].CreateTime > sourceMsgs[sourceMsgsAnchor].CreateTime {
+		if newMsgs[newMsgsAnchor].CommentID > sourceMsgs[sourceMsgsAnchor].CommentID {
 			lastMsgs = append(lastMsgs, newMsgs[newMsgsAnchor])
 			newMsgsAnchor++
-		} else if newMsgs[newMsgsAnchor].CreateTime < sourceMsgs[sourceMsgsAnchor].CreateTime {
+		} else if newMsgs[newMsgsAnchor].CommentID < sourceMsgs[sourceMsgsAnchor].CommentID {
 			lastMsgs = append(lastMsgs, sourceMsgs[sourceMsgsAnchor])
 			sourceMsgsAnchor++
 		} else {
@@ -152,12 +147,13 @@ func (c *SinaFinanceCollector) Load(maxLength int64) (err error) {
 	)
 
 	for {
-		currentMsgs, err := c.GetMsgs(i, DefaultPageSize)
+		currentMsgs, err := c.GetMsgs(i, SinaFinanceDefaultPageSize)
 		if err != nil {
 			return err
 		}
 		c.Msgs = c.MergeMsgs(c.Msgs, currentMsgs)
-		if int64(len(c.Msgs)) > maxLength {
+		fmt.Printf("GET %d data\n", int64(len(c.Msgs)))
+		if int64(len(c.Msgs)) >= maxLength {
 			break
 		}
 		i++
