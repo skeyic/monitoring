@@ -6,11 +6,14 @@ import (
 )
 
 func TestFutuCollector_Load(t *testing.T) {
-	err := TheFutuCollector.Load()
+	err := TheFutuCollector.LoadFromFile()
 	if err != nil {
 		fmt.Printf("ERR: %v\n", err)
 		return
 	}
+
+	TheFutuCollector.Analysis()
+	fmt.Printf("VALIDATION: %v\n", TheFutuCollector.Validation())
 
 	//for idx, msg := range TheFutuCollector.Msgs {
 	//	fmt.Printf("IDX: %d, MSG: %+v\n", idx, msg)
@@ -24,11 +27,17 @@ func TestFutuCollector_Load(t *testing.T) {
 }
 
 func TestTheFutuCollectorInit(t *testing.T) {
-	err := TheFutuCollector.LoadFromFile()
+	var (
+		err error
+	)
+
+	err = TheFutuCollector.LoadFromFile()
 	if err != nil {
 		fmt.Printf("ERR: %v\n", err)
 		return
 	}
+
+	TheFutuCollector.Start()
 
 	fmt.Printf("TOTAL %d MSGS\n", len(TheFutuCollector.Msgs))
 
@@ -39,6 +48,8 @@ func TestTheFutuCollectorInit(t *testing.T) {
 	}
 
 	fmt.Printf("TOTAL %d MSGS\n", len(TheFutuCollector.Msgs))
+
+	<-make(chan struct{}, 1)
 
 	//for idx, msg := range TheFutuCollector.Msgs {
 	//	if strings.Contains(msg.RichText, "目标价") && strings.Contains(msg.RichText, "评级") {
@@ -54,13 +65,13 @@ func TestTheFutuCollectorInit(t *testing.T) {
 }
 
 func TestTheFutuCollectorKeepRefresh(t *testing.T) {
-	err := TheFutuCollector.LoadFromFile()
+	TheFutuCollector.AddFilter(NewRateFutuMsgFilter())
+	err := TheFutuCollector.Start()
 	if err != nil {
 		fmt.Printf("ERR: %v\n", err)
 		return
 	}
-
-	fmt.Printf("TOTAL %d MSGS\n", len(TheFutuCollector.Msgs))
+	//TheFutuCollector.Analysis()
 
 	//for idx, msg := range TheFutuCollector.Msgs {
 	//	if strings.Contains(msg.RichText, "目标价") && strings.Contains(msg.RichText, "评级") {
@@ -73,4 +84,5 @@ func TestTheFutuCollectorKeepRefresh(t *testing.T) {
 	//		fmt.Printf("IDX: %d, MSG: %+v\n", idx, msg)
 	//	}
 	//}
+	<-make(chan struct{}, 1)
 }

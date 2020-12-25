@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"sync"
+	"time"
 )
 
 const (
@@ -130,13 +131,14 @@ func (c *DLCollector) GetMsg() (msg *DLMsg, err error) {
 func (c *DLCollector) Load() (err error) {
 	var (
 		pauseCount    = 0
-		maxPauseCount = 3
+		maxPauseCount = 300
 		i             = 0
 	)
 
 	for {
 		i++
 		msgThisRound, err := c.GetMsg()
+		time.Sleep(100 * time.Millisecond)
 		if err != nil {
 			return err
 		}
