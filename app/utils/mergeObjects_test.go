@@ -6,10 +6,10 @@ import (
 )
 
 type Student struct {
-	id int
+	id int64
 }
 
-func (s Student) ID() int {
+func (s Student) ID() int64 {
 	return s.id
 }
 
@@ -27,6 +27,9 @@ func TestMergeDescendObjects(t *testing.T) {
 			},
 			Student{
 				id: 13,
+			},
+			Student{
+				id: 9,
 			},
 		}
 		s2 = []ToMergeObject{

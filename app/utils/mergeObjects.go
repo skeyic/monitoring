@@ -1,7 +1,7 @@
 package utils
 
 type ToMergeObject interface {
-	ID() int
+	ID() int64
 }
 
 // Descend arrays

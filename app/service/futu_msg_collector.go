@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/buger/jsonparser"
 	"github.com/skeyic/monitoring/app/utils"
+	"github.com/skeyic/monitoring/config"
 	"net/http"
 	"os"
 	"sort"
@@ -21,8 +22,13 @@ const (
 	TheFutuCollectorFileName = "TheFutuCollector.data.test"
 )
 
+// If do not look back, just check the new message
+// Else, check until reach the init message number
+
 var (
-	TheFutuCollector = NewFutuCollector(TheFutuCollectorFileName).InitMsgNum(FutuDefaultInitMsgNum)
+	TheFutuCollector = NewFutuCollector(TheFutuCollectorFileName).
+		InitMsgNum(FutuDefaultInitMsgNum).
+		LookBack(config.Config.LookBack)
 )
 
 type FutuMsgFilter interface {
@@ -56,6 +62,10 @@ type FutuMsg struct {
 	RichText   string `json:"content"`
 }
 
+func (s *FutuMsg) ID() int64 {
+	return s.CommentID
+}
+
 func (s *FutuMsg) AutoMigrate() {
 	if strings.Contains(s.CreateTime, "-") {
 		return
@@ -82,6 +92,8 @@ type FutuCollector struct {
 	fileName   string
 	initMsgNum int
 
+	lookBack bool
+
 	msgLock *sync.RWMutex
 	Msgs    FutuMsgs
 
@@ -100,6 +112,11 @@ func (c *FutuCollector) InitMsgNum(initMsgNum int) *FutuCollector {
 	return c
 }
 
+func (c *FutuCollector) LookBack(lookBack bool) *FutuCollector {
+	c.lookBack = lookBack
+	return c
+}
+
 func (c *FutuCollector) Start() (err error) {
 	return c.Process()
 }
@@ -115,8 +132,8 @@ func (c *FutuCollector) Process() (err error) {
 		return
 	}
 
-	// Start auto save after loading
-	go c.AutoSave()
+	//// Start auto save after loading
+	//go c.AutoSave()
 
 	var (
 		ticker = time.NewTicker(FutuDefaultLoadInterval)
@@ -182,6 +199,9 @@ func (c *FutuCollector) SaveToFile() (err error) {
 }
 
 func (c *FutuCollector) LoadFromFile() (err error) {
+	// We do not want to save & load again
+	return
+
 	data, err := utils.ReadFromFile(c.fileName)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -234,46 +254,21 @@ func (c *FutuCollector) MergeMsgs(sourceMsgs, newMsgs []*FutuMsg) (lastMsgs []*F
 	// We know the msg list are descend
 
 	var (
-		newMsgsAnchor, sourceMsgsAnchor = 0, 0
-		newMsgsLength, sourceMsgsLength = len(newMsgs), len(sourceMsgs)
+		sourceObjects, newObjects []utils.ToMergeObject
 	)
 
-	if sourceMsgsLength == 0 {
-		return newMsgs
-	}
-	if newMsgsLength == 0 {
-		return sourceMsgs
+	for _, msg := range sourceMsgs {
+		sourceObjects = append(sourceObjects, msg)
 	}
 
-	if newMsgs[newMsgsLength-1].CommentID > sourceMsgs[0].CommentID {
-		return append(sourceMsgs, newMsgs...)
+	for _, msg := range newMsgs {
+		newObjects = append(newObjects, msg)
 	}
 
-	if newMsgs[newMsgsLength-1].CommentID > sourceMsgs[0].CommentID {
-		return append(sourceMsgs, newMsgs...)
-	}
+	lastObjects := utils.MergeDescendObjects(sourceObjects, newObjects)
 
-	for {
-		if newMsgs[newMsgsAnchor].CommentID > sourceMsgs[sourceMsgsAnchor].CommentID {
-			lastMsgs = append(lastMsgs, newMsgs[newMsgsAnchor])
-			newMsgsAnchor++
-		} else if newMsgs[newMsgsAnchor].CommentID < sourceMsgs[sourceMsgsAnchor].CommentID {
-			lastMsgs = append(lastMsgs, sourceMsgs[sourceMsgsAnchor])
-			sourceMsgsAnchor++
-		} else {
-			lastMsgs = append(lastMsgs, sourceMsgs[sourceMsgsAnchor])
-			sourceMsgsAnchor++
-			newMsgsAnchor++
-		}
-
-		if newMsgsAnchor == newMsgsLength {
-			lastMsgs = append(lastMsgs, sourceMsgs[sourceMsgsAnchor:]...)
-			break
-		}
-		if sourceMsgsAnchor == sourceMsgsLength {
-			lastMsgs = append(lastMsgs, newMsgs[newMsgsAnchor:]...)
-			break
-		}
+	for _, msg := range lastObjects {
+		lastMsgs = append(lastMsgs, msg.(*FutuMsg))
 	}
 
 	return
