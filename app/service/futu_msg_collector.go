@@ -290,14 +290,7 @@ func (c *FutuCollector) Analysis() {
 	}
 }
 
-func (c *FutuCollector) ApplyFilter() {
-	var (
-		msgsToAnalysis []*FutuMsg
-	)
-	c.msgLock.RLock()
-	msgsToAnalysis = c.Msgs
-	c.msgLock.RUnlock()
-
+func (c *FutuCollector) ApplyFilter(msgsToAnalysis []*FutuMsg) {
 	for _, msg := range msgsToAnalysis {
 		for _, theFilter := range c.filters {
 			if theFilter.Match(msg) {
@@ -333,6 +326,8 @@ func (c *FutuCollector) Load() (err error) {
 			return nil
 		}
 		msgsLengthAfterMerge := len(msgsBeforeLoad)
+
+		c.ApplyFilter(msgsBeforeLoad[msgsLengthBeforeMerge:])
 
 		c.msgLock.Lock()
 		c.Msgs = msgsBeforeLoad
