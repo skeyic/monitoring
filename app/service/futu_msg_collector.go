@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/buger/jsonparser"
+	"github.com/golang/glog"
 	"github.com/skeyic/monitoring/app/utils"
-	"github.com/skeyic/monitoring/config"
 	"net/http"
 	"os"
 	"sort"
@@ -27,8 +27,7 @@ const (
 
 var (
 	TheFutuCollector = NewFutuCollector(TheFutuCollectorFileName).
-		InitMsgNum(FutuDefaultInitMsgNum).
-		LookBack(config.Config.LookBack)
+		InitMsgNum(FutuDefaultPageSize)
 )
 
 type FutuMsgFilter interface {
@@ -45,7 +44,7 @@ func NewRateFutuMsgFilter() RateFutuMsgFilter {
 
 func (r RateFutuMsgFilter) Match(msg *FutuMsg) bool {
 	if strings.Contains(msg.RichText, "目标价") && strings.Contains(msg.RichText, "评级") {
-		//		fmt.Printf("IDX: %d, MSG: %+v\n", idx, msg)
+		//		glog.V(4).Infof("IDX: %d, MSG: %+v\n", idx, msg)
 		//	}
 		return true
 	}
@@ -53,7 +52,7 @@ func (r RateFutuMsgFilter) Match(msg *FutuMsg) bool {
 }
 
 func (r RateFutuMsgFilter) Alert(msg *FutuMsg) error {
-	return utils.SendAlert(fmt.Sprintf("Rate "+msg.CreateTime), msg.RichText)
+	return utils.SendAlertV2(fmt.Sprintf("Rate "+msg.CreateTime), msg.RichText)
 }
 
 type FutuMsg struct {
@@ -126,11 +125,11 @@ func (c *FutuCollector) AddFilter(f FutuMsgFilter) {
 }
 
 func (c *FutuCollector) Process() (err error) {
-	err = TheFutuCollector.LoadFromFile()
-	if err != nil {
-		fmt.Printf("ERR: %v\n", err)
-		return
-	}
+	//err = TheFutuCollector.LoadFromFile()
+	//if err != nil {
+	//	glog.V(4).Infof("ERR: %v\n", err)
+	//	return
+	//}
 
 	//// Start auto save after loading
 	//go c.AutoSave()
@@ -145,10 +144,10 @@ func (c *FutuCollector) Process() (err error) {
 			go func(l *utils.AsyncLocker, a time.Time) {
 				if l.TryLock() {
 					defer l.Unlock()
-					fmt.Printf("LOAD error: %v at %s\n", c.Load(), a)
+					glog.V(4).Infof("LOAD error: %v at %s\n", c.Load(), a)
 					return
 				}
-				fmt.Printf("Another task is running, %s\n", a)
+				glog.V(4).Infof("Another task is running, %s\n", a)
 			}(locker, a)
 		}
 	}
@@ -161,9 +160,9 @@ func (c *FutuCollector) AutoSave() {
 		select {
 		case a := <-ticker.C:
 			go func(t time.Time) {
-				fmt.Printf("Trigger save at %s\n", a)
+				glog.V(4).Infof("Trigger save at %s\n", a)
 				err := c.SaveToFile()
-				fmt.Printf("Save at %s, err: %v\n", a, err)
+				glog.V(4).Infof("Save at %s, err: %v\n", a, err)
 			}(a)
 		}
 	}
@@ -175,11 +174,12 @@ func checkDuplicate(msgs FutuMsgs) bool {
 		result = true
 	)
 
-	for _, msg := range msgs {
+	for idx, msg := range msgs {
 		if _, hit := idxMap[msg.CommentID]; hit {
-			fmt.Printf("DUPLICATE RECORD: %v\n", msg)
+			glog.V(4).Infof("DUPLICATE RECORD: %v\n", msg)
 			result = false
 		}
+		glog.V(4).Infof("IDX: %d, MSG: %v", idx, msg)
 		idxMap[msg.CommentID] = true
 	}
 	return result
@@ -187,10 +187,8 @@ func checkDuplicate(msgs FutuMsgs) bool {
 
 func (c *FutuCollector) Validation() (result bool) {
 	c.msgLock.RLock()
-	msgs := c.Msgs
-	c.msgLock.RUnlock()
-
-	return checkDuplicate(msgs)
+	defer c.msgLock.RUnlock()
+	return checkDuplicate(c.Msgs)
 }
 
 func (c *FutuCollector) SaveToFile() (err error) {
@@ -205,7 +203,7 @@ func (c *FutuCollector) LoadFromFile() (err error) {
 	data, err := utils.ReadFromFile(c.fileName)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Printf("LoadFromFile: No such file\n")
+			glog.V(4).Infof("LoadFromFile: No such file\n")
 			return nil
 		}
 		return
@@ -215,7 +213,7 @@ func (c *FutuCollector) LoadFromFile() (err error) {
 		return
 	}
 	sort.Sort(c.Msgs)
-	fmt.Printf("LoadFromFile: TOTAL %d MSGS\n", len(c.Msgs))
+	glog.V(4).Infof("LoadFromFile: TOTAL %d MSGS\n", len(c.Msgs))
 	return
 }
 
@@ -226,24 +224,24 @@ func (c *FutuCollector) GetMsgs(page, pageSize int) (msgs []*FutuMsg, err error)
 
 	rCode, rBody, rErr := utils.SendRequest(http.MethodGet, url, nil)
 	if rErr != nil {
-		fmt.Printf("HTTP ERROR: %v, CODE: %d, BODY: %s\n", rErr, rCode, rBody)
+		glog.V(4).Infof("HTTP ERROR: %v, CODE: %d, BODY: %s\n", rErr, rCode, rBody)
 		return
 	}
 
 	msgSource, _, _, err := jsonparser.Get([]byte(rBody), "data", "list")
 	if err != nil {
-		fmt.Printf("Get ERR: %v\n", err)
+		glog.V(4).Infof("Get ERR: %v\n", err)
 		return
 	}
 
 	err = json.Unmarshal(msgSource, &msgs)
 	if err != nil {
-		fmt.Printf("Unmarshal ERR: %v\n", err)
+		glog.V(4).Infof("Unmarshal ERR: %v\n", err)
 		return
 	}
 
 	for _, msg := range msgs {
-		//fmt.Printf("IDX: %d, MSG: %+v\n", idx, msg)
+		//glog.V(4).Infof("IDX: %d, MSG: %+v\n", idx, msg)
 		msg.AutoMigrate()
 	}
 
@@ -288,7 +286,7 @@ func (c *FutuCollector) Analysis() {
 	}
 
 	for key, value := range dateMap {
-		fmt.Printf("DATE: %s, NUM: %d\n", key, len(value))
+		glog.V(4).Infof("DATE: %s, NUM: %d\n", key, len(value))
 	}
 }
 
@@ -311,9 +309,8 @@ func (c *FutuCollector) ApplyFilter() {
 
 func (c *FutuCollector) Load() (err error) {
 	var (
-		i                 = 0
-		msgsBeforeLoad    []*FutuMsg
-		lastMsgBeforeLoad *FutuMsg
+		i              = 0
+		msgsBeforeLoad []*FutuMsg
 	)
 
 	c.msgLock.RLock()
@@ -321,55 +318,43 @@ func (c *FutuCollector) Load() (err error) {
 	c.msgLock.RUnlock()
 
 	var (
-		pauseCount    = 0
-		maxPauseCount = 30
-		initial       = len(msgsBeforeLoad) == 0
+		initial = len(msgsBeforeLoad) == 0
 	)
 
 	for {
-		if len(msgsBeforeLoad) != 0 {
-			lastMsgBeforeLoad = msgsBeforeLoad[0]
-		}
-
 		msgsThisRound, err := c.GetMsgs(i, FutuDefaultPageSize)
 		if err != nil {
 			return err
 		}
-		msgsLengthBeforeMerge := len(msgsBeforeLoad)
 		msgsBeforeLoad = c.MergeMsgs(msgsBeforeLoad, msgsThisRound)
+		msgsLengthBeforeMerge := len(msgsBeforeLoad)
 		if !checkDuplicate(msgsBeforeLoad) {
-			fmt.Printf("FATAL, WE HAVE DUPLICATE RECORD\n")
+			glog.V(4).Infof("FATAL, WE HAVE DUPLICATE RECORD\n")
 			return nil
 		}
 		msgsLengthAfterMerge := len(msgsBeforeLoad)
-		if msgsLengthAfterMerge == msgsLengthBeforeMerge {
-			pauseCount++
-		} else {
-			pauseCount = 0
-			c.msgLock.Lock()
-			c.Msgs = msgsBeforeLoad
-			fmt.Printf("Load more data, current: %d\n", msgsLengthAfterMerge)
-			c.msgLock.Unlock()
-		}
 
-		if pauseCount == maxPauseCount {
-			fmt.Printf("No more data could load, current: %d, last message previous round: %v\n", msgsLengthBeforeMerge, lastMsgBeforeLoad)
-			break
-		}
+		c.msgLock.Lock()
+		c.Msgs = msgsBeforeLoad
+		glog.V(4).Infof("Load more data, current: %d\n", msgsLengthAfterMerge)
+		c.msgLock.Unlock()
 
-		if !initial && lastMsgBeforeLoad != nil && msgsThisRound[len(msgsThisRound)-1].CommentID < lastMsgBeforeLoad.CommentID {
-			fmt.Printf("Catch up the msgs, eariest this round: %v, last message previous round: %v\n", msgsThisRound[len(msgsThisRound)-1], lastMsgBeforeLoad)
-			break
-		}
+		glog.V(4).Infof("INIT: %v, CURRENT: %d, BEFORE: %d", initial, msgsLengthAfterMerge, msgsLengthBeforeMerge)
 
 		if initial && msgsLengthAfterMerge >= c.initMsgNum {
-			fmt.Printf("Reach the max init msg num, eariest this round: %v\n", msgsThisRound[len(msgsThisRound)-1])
+			glog.V(4).Infof("Reach the max init msg num, initMsgNum: %d, current: %d", c.initMsgNum, msgsLengthAfterMerge)
 			break
 		}
+
+		if !initial && msgsLengthAfterMerge-msgsLengthBeforeMerge < FutuDefaultPageSize {
+			glog.V(4).Infof("Catch up the msgs, current: %d, previous: %d", msgsLengthAfterMerge, msgsLengthBeforeMerge)
+			break
+		}
+
 		i++
 	}
 
-	fmt.Printf("Validation after load to check duplicate records: %v\n", c.Validation())
+	glog.V(4).Infof("Validation after load to check duplicate records: %v\n", c.Validation())
 
 	return nil
 }

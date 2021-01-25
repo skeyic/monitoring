@@ -1,0 +1,4 @@
+neuron:
+  restart: always
+  image: localhost:5000/monitoring
+  command: /application/monitoring -logtostderr -v=4

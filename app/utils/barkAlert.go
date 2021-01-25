@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/golang/glog"
 	"net/http"
 )
 
@@ -11,6 +13,22 @@ func SendAlert(title, content string) error {
 	)
 
 	fmt.Println(SendRequest(http.MethodPost, fmt.Sprintf(barkURL, title, content), nil))
+
+	return nil
+}
+
+// http://www.xiaxuanli.com:7474/users/2db982e4-9492-4202-a4c9-e615e01883f9/send -H "accept: application/json" -H "Content-Type: application/json" -d "{ \"content\": \"futu rate speaker\", \"title\": \"test\"}"
+func SendAlertV2(title, content string) error {
+	var (
+		barkURL = "http://www.xiaxuanli.com:7474/users/2db982e4-9492-4202-a4c9-e615e01883f9/send"
+	)
+
+	body := bytes.NewBufferString(fmt.Sprintf("{\"content\": \"%s\", \"title\": \"%s\"}", content, title))
+
+	rCode, rBody, rError := SendRequest(http.MethodPost, barkURL, body)
+	if rError != nil {
+		glog.Errorf("failed to send alert, rCode: %d, rBody: %v, rError: %v", rCode, rBody, rError)
+	}
 
 	return nil
 }
