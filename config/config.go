@@ -5,10 +5,10 @@ import (
 )
 
 var Config = struct {
-	DebugMode bool `default:"true"`
-	Port      uint `default:"8000"`
-
-	LookBack bool `default:"false" env:"LOOK_BACK"`
+	NeuronServer struct {
+		URL  string `default:"http://www.xiaxuanli.com:7474" env:"NEURON_SERVER_URL"`
+		User string `default:"2db982e4-9492-4202-a4c9-e615e01883f9" env:"NEURON_SERVER_USER"`
+	}
 }{}
 
 func init() {

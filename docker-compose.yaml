@@ -2,3 +2,6 @@ neuron:
   restart: always
   image: localhost:5000/monitoring
   command: /application/monitoring -logtostderr -v=4
+  environment:
+    NEURON_SERVER_URL: "http://www.xiaxuanli.com:7474"
+    NEURON_SERVER_USER: "2db982e4-9492-4202-a4c9-e615e01883f9"
