@@ -44,8 +44,7 @@ func NewRateFutuMsgFilter() RateFutuMsgFilter {
 
 func (r RateFutuMsgFilter) Match(msg *FutuMsg) bool {
 	if strings.Contains(msg.RichText, "目标价") && strings.Contains(msg.RichText, "评级") {
-		//		glog.V(4).Infof("IDX: %d, MSG: %+v\n", idx, msg)
-		//	}
+		glog.V(4).Infof("MATCH RULE MSG: %+v\n", msg)
 		return true
 	}
 	return false
@@ -53,6 +52,25 @@ func (r RateFutuMsgFilter) Match(msg *FutuMsg) bool {
 
 func (r RateFutuMsgFilter) Alert(msg *FutuMsg) error {
 	return utils.SendAlertV2(fmt.Sprintf("Rate "+msg.CreateTime), msg.RichText)
+}
+
+type TestFutuMsgFilter struct {
+}
+
+func NewTestFutuMsgFilter() TestFutuMsgFilter {
+	return TestFutuMsgFilter{}
+}
+
+func (r TestFutuMsgFilter) Match(msg *FutuMsg) bool {
+	if strings.Contains(msg.RichText, "的") {
+		glog.V(4).Infof("MATCH RULE MSG: %+v\n", msg)
+		return true
+	}
+	return false
+}
+
+func (r TestFutuMsgFilter) Alert(msg *FutuMsg) error {
+	return utils.SendAlertV2(fmt.Sprintf("Test "+msg.CreateTime), msg.RichText)
 }
 
 type FutuMsg struct {
@@ -319,12 +337,12 @@ func (c *FutuCollector) Load() (err error) {
 		if err != nil {
 			return err
 		}
-		msgsBeforeLoad = c.MergeMsgs(msgsBeforeLoad, msgsThisRound)
 		msgsLengthBeforeMerge := len(msgsBeforeLoad)
-		if !checkDuplicate(msgsBeforeLoad) {
-			glog.V(4).Infof("FATAL, WE HAVE DUPLICATE RECORD\n")
-			return nil
-		}
+		msgsBeforeLoad = c.MergeMsgs(msgsBeforeLoad, msgsThisRound)
+		//if !checkDuplicate(msgsBeforeLoad) {
+		//	glog.V(4).Infof("FATAL, WE HAVE DUPLICATE RECORD\n")
+		//	return nil
+		//}
 		msgsLengthAfterMerge := len(msgsBeforeLoad)
 
 		c.ApplyFilter(msgsBeforeLoad[msgsLengthBeforeMerge:])
