@@ -51,6 +51,7 @@ func (r RateFutuMsgFilter) Match(msg *FutuMsg) bool {
 }
 
 func (r RateFutuMsgFilter) Alert(msg *FutuMsg) error {
+	glog.V(4).Infof("ALERT MSG: %+v\n", msg)
 	return utils.SendAlertV2(fmt.Sprintf("Rate "+msg.CreateTime), msg.RichText)
 }
 
@@ -345,7 +346,7 @@ func (c *FutuCollector) Load() (err error) {
 		//}
 		msgsLengthAfterMerge := len(msgsBeforeLoad)
 
-		c.ApplyFilter(msgsBeforeLoad[msgsLengthBeforeMerge:])
+		c.ApplyFilter(msgsBeforeLoad[:msgsLengthAfterMerge-msgsLengthBeforeMerge])
 
 		c.msgLock.Lock()
 		c.Msgs = msgsBeforeLoad
@@ -367,7 +368,7 @@ func (c *FutuCollector) Load() (err error) {
 		i++
 	}
 
-	glog.V(4).Infof("Validation after load to check duplicate records: %v\n", c.Validation())
+	//glog.V(4).Infof("Validation after load to check duplicate records: %v\n", c.Validation())
 
 	return nil
 }
