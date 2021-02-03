@@ -54,3 +54,23 @@ func TestMergeDescendObjects(t *testing.T) {
 	}
 	fmt.Println()
 }
+
+func TestArray(t *testing.T) {
+	var (
+		sl = []string{"a", "b", "c", "d"}
+		lb = len(sl)
+	)
+
+	sl = append([]string{"e"}, sl...)
+	la := len(sl)
+	fmt.Println(sl[:la-lb])
+
+	lb = len(sl)
+	sl = append([]string{"f"}, sl...)
+	la = len(sl)
+	fmt.Println(sl[:la-lb])
+
+	lb = len(sl)
+	la = len(sl)
+	fmt.Println(sl[:la-lb])
+}

@@ -56,6 +56,7 @@ var (
 )
 
 func (r RateFutuMsgFilter) Alert(msg *FutuMsg) error {
+	glog.V(4).Infof("ALERT MSG: %+v\n", msg)
 	if previousMsg != nil && previousMsg.RichText == msg.RichText {
 		glog.Warningf("Same as previous alert %+v, current: %+v,skip", previousMsg, msg)
 		return nil
@@ -356,8 +357,8 @@ func (c *FutuCollector) Load() (err error) {
 		//}
 		msgsLengthAfterMerge := len(msgsBeforeLoad)
 
-		glog.V(8).Infof("ApplyFilter FROM %d to %d", msgsLengthBeforeMerge, msgsLengthAfterMerge)
-		c.ApplyFilter(msgsBeforeLoad[msgsLengthBeforeMerge:])
+		glog.V(8).Infof("ApplyFilter checking [:%d]", msgsLengthAfterMerge-msgsLengthBeforeMerge)
+		c.ApplyFilter(msgsBeforeLoad[:msgsLengthAfterMerge-msgsLengthBeforeMerge])
 
 		c.msgLock.Lock()
 		c.Msgs = msgsBeforeLoad
@@ -379,7 +380,7 @@ func (c *FutuCollector) Load() (err error) {
 		i++
 	}
 
-	glog.V(4).Infof("Validation after load to check duplicate records: %v\n", c.Validation())
+	//glog.V(4).Infof("Validation after load to check duplicate records: %v\n", c.Validation())
 
 	return nil
 }
