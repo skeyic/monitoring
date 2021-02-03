@@ -50,7 +50,17 @@ func (r RateFutuMsgFilter) Match(msg *FutuMsg) bool {
 	return false
 }
 
+// just used to dedup before fixing the duplicate alert issue
+var (
+	previousMsg *FutuMsg
+)
+
 func (r RateFutuMsgFilter) Alert(msg *FutuMsg) error {
+	if previousMsg != nil && previousMsg.RichText == msg.RichText {
+		glog.Warningf("Same as previous alert %+v, current: %+v,skip", previousMsg, msg)
+		return nil
+	}
+	previousMsg = msg
 	return utils.SendAlertV2(fmt.Sprintf("Rate "+msg.CreateTime), msg.RichText)
 }
 
@@ -310,6 +320,7 @@ func (c *FutuCollector) Analysis() {
 
 func (c *FutuCollector) ApplyFilter(msgsToAnalysis []*FutuMsg) {
 	for _, msg := range msgsToAnalysis {
+		glog.V(8).Infof("ApplyFilter CHECKING: %+v", msg)
 		for _, theFilter := range c.filters {
 			if theFilter.Match(msg) {
 				theFilter.Alert(msg)
@@ -345,6 +356,7 @@ func (c *FutuCollector) Load() (err error) {
 		//}
 		msgsLengthAfterMerge := len(msgsBeforeLoad)
 
+		glog.V(8).Infof("ApplyFilter FROM %d to %d", msgsLengthBeforeMerge, msgsLengthAfterMerge)
 		c.ApplyFilter(msgsBeforeLoad[msgsLengthBeforeMerge:])
 
 		c.msgLock.Lock()
